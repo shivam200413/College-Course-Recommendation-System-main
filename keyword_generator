@@ -1,0 +1,48 @@
+import pandas
+import neattext.functions as nt_func
+import numpy
+from sklearn.metrics.pairwise import cosine_similarity, linear_kernel
+from sklearn.feature_extraction.text import CountVectorizer,TfidfVectorizer
+from keybert import KeyBERT
+
+
+dataframe = pandas.read_csv("dataset/courses.csv")
+
+#Simplified course names
+dataframe["Simplified_Title"] = dataframe["course_title"].apply(nt_func.remove_stopwords)
+dataframe["Simplified_Title"] = dataframe["Simplified_Title"].apply(nt_func.remove_special_characters)
+dataframe["Simplified_Title"] = dataframe['Simplified_Title'].str.lower()
+dataframe["course_title_l"] = dataframe["course_title"].str.lower()
+
+#Text Vectorization Process
+cvector = CountVectorizer()
+cvector_matrix = cvector.fit_transform(dataframe['Simplified_Title'])
+
+#building cosine similarity matrix
+cossim_matrix = cosine_similarity(cvector_matrix)
+#Getting course id
+course_id = pandas.Series(dataframe.index, index=dataframe['course_title_l']).drop_duplicates()
+
+
+
+
+kw_model = KeyBERT(model='all-mpnet-base-v2')
+
+
+dataframe['keywords'] = ""
+allkey_list = []
+for title in dataframe["course_title_l"]:
+    keywords = kw_model.extract_keywords(title, keyphrase_ngram_range=(1,3), stop_words="english", highlight =False, top_n=10)
+    keywords_list = list(dict(keywords).keys())
+    #print(keywords_list)
+    
+    title_index = dataframe.index[dataframe["course_title_l"] == title].tolist()
+    title_index = title_index[0]
+    print(title_index)
+    dataframe.at[title_index, "keywords"] = keywords_list
+
+dataframe.to_csv('courses_with_keywords.csv')  
+
+    
+
+
